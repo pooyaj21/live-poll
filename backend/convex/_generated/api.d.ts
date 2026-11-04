@@ -9,6 +9,7 @@
  */
 
 import type * as polls from "../polls.js";
+import type * as votes from "../votes.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   polls: typeof polls;
+  votes: typeof votes;
 }>;
 
 /**
