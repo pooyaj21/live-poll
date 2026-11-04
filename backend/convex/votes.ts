@@ -1,3 +1,4 @@
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -5,12 +6,12 @@ import type { Id } from "./_generated/dataModel";
 async function findVote(
   ctx: QueryCtx,
   pollId: Id<"polls">,
-  deviceId: string,
+  userId: Id<"users">,
 ) {
   return await ctx.db
     .query("votes")
-    .withIndex("by_pollId_and_deviceId", (q) =>
-      q.eq("pollId", pollId).eq("deviceId", deviceId),
+    .withIndex("by_pollId_and_userId", (q) =>
+      q.eq("pollId", pollId).eq("userId", userId),
     )
     .unique();
 }
@@ -19,11 +20,11 @@ export const cast = mutation({
   args: {
     pollId: v.id("polls"),
     option: v.string(),
-    deviceId: v.string(),
   },
   handler: async (ctx, args) => {
-    if (args.deviceId.trim() === "") {
-      throw new ConvexError("Missing device id");
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      throw new ConvexError("Not signed in");
     }
 
     const poll = await ctx.db.get("polls", args.pollId);
@@ -34,7 +35,7 @@ export const cast = mutation({
       throw new ConvexError("That option is not on this poll");
     }
 
-    const existing = await findVote(ctx, args.pollId, args.deviceId);
+    const existing = await findVote(ctx, args.pollId, userId);
     if (existing !== null) {
       if (existing.option !== args.option) {
         await ctx.db.patch("votes", existing._id, { option: args.option });
@@ -45,7 +46,7 @@ export const cast = mutation({
     return await ctx.db.insert("votes", {
       pollId: args.pollId,
       option: args.option,
-      deviceId: args.deviceId,
+      userId,
     });
   },
 });
@@ -53,10 +54,14 @@ export const cast = mutation({
 export const myVote = query({
   args: {
     pollId: v.id("polls"),
-    deviceId: v.string(),
   },
   handler: async (ctx, args) => {
-    const vote = await findVote(ctx, args.pollId, args.deviceId);
+    const userId = await getAuthUserId(ctx);
+    if (userId === null) {
+      return null;
+    }
+
+    const vote = await findVote(ctx, args.pollId, userId);
     return vote?.option ?? null;
   },
 });
@@ -72,7 +77,7 @@ export const results = query({
     const counts = new Map(poll.options.map((option) => [option, 0]));
     const votes = ctx.db
       .query("votes")
-      .withIndex("by_pollId_and_deviceId", (q) => q.eq("pollId", args.pollId));
+      .withIndex("by_pollId_and_userId", (q) => q.eq("pollId", args.pollId));
     for await (const vote of votes) {
       counts.set(vote.option, (counts.get(vote.option) ?? 0) + 1);
     }
