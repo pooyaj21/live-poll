@@ -8,6 +8,8 @@ export default defineSchema({
   polls: defineTable({
     question: v.string(),
     options: v.array(v.string()),
+    // Optional: polls created before sign-in existed have no creator.
+    createdBy: v.optional(v.id("users")),
   }),
 
   votes: defineTable({

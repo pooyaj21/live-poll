@@ -2,6 +2,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
+import { requireNamedUser } from "./lib/auth";
 
 async function findVote(
   ctx: QueryCtx,
@@ -22,10 +23,7 @@ export const cast = mutation({
     option: v.string(),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (userId === null) {
-      throw new ConvexError("Not signed in");
-    }
+    const { userId } = await requireNamedUser(ctx);
 
     const poll = await ctx.db.get("polls", args.pollId);
     if (poll === null) {
