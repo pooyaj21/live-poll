@@ -1,4 +1,6 @@
 import { ConvexAuthProvider } from '@convex-dev/auth/react';
+import { DebugMenuProvider } from '@pj21/debug-menu';
+import { loggedWebSocket } from '@pj21/debug-menu/convex';
 import { ConvexReactClient, useConvexAuth, useQuery } from 'convex/react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { ActivityIndicator, Platform, StyleSheet, useColorScheme } from 'react-native';
@@ -6,26 +8,31 @@ import { ActivityIndicator, Platform, StyleSheet, useColorScheme } from 'react-n
 import { AnonymousSignIn } from '@/components/anonymous-sign-in';
 import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/backend';
+import { debugPlugins } from '@/lib/debug-menu';
 import { secureStorage } from '@/lib/secure-storage';
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   // Not meaningful outside the browser.
   unsavedChangesWarning: false,
+  // Records Convex traffic for the debug menu; plain WebSocket in production.
+  webSocketConstructor: loggedWebSocket,
 });
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ConvexAuthProvider
-      client={convex}
-      // expo-secure-store has no web implementation; fall back to the default localStorage there.
-      storage={Platform.OS === 'web' ? undefined : secureStorage}>
-      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        <AnonymousSignIn />
-        <Routes />
-      </ThemeProvider>
-    </ConvexAuthProvider>
+    <DebugMenuProvider enabled={__DEV__} plugins={debugPlugins} triggers={{ shake: true }}>
+      <ConvexAuthProvider
+        client={convex}
+        // expo-secure-store has no web implementation; fall back to the default localStorage there.
+        storage={Platform.OS === 'web' ? undefined : secureStorage}>
+        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+          <AnonymousSignIn />
+          <Routes />
+        </ThemeProvider>
+      </ConvexAuthProvider>
+    </DebugMenuProvider>
   );
 }
 
